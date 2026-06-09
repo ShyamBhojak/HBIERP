@@ -14,6 +14,7 @@ import StudentModal from './components/StudentModal';
 import DashboardView from './views/DashboardView';
 import InquiriesView from './views/InquiriesView';
 import StudentsView from './views/StudentsView';
+import AttendanceView from './views/AttendanceView';
 
 const App = () => {
   const currentMonth = getCurrentMonthYear();
@@ -34,6 +35,7 @@ const App = () => {
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [courseFilter] = useState('All');
   const [globalMonth, setGlobalMonth] = useState(currentMonth);
+  const [attendance, setAttendance] = useState([]);
 
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -127,6 +129,33 @@ const App = () => {
       }));
     }, (err) => console.error(err));
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const attendanceCollection = collection(db, 'artifacts', appId, 'public', 'data', 'attendance');
+    return onSnapshot(attendanceCollection, (snapshot) => {
+      setAttendance(snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })));
+    }, (err) => console.error(err));
+  }, [user]);
+
+  const saveAttendance = async (dailyKey, payload) => {
+    try {
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'attendance', dailyKey);
+      await updateDoc(docRef, payload).catch(async (err) => {
+        if (err.code === 'not-found') {
+          const { setDoc } = await import('firebase/firestore');
+          await setDoc(docRef, payload);
+        } else {
+          throw err;
+        }
+      });
+    } catch (e) {
+      console.error("Attendance writing matrix error:", e);
+    }
+  };
 
   const handleSaveLead = async (e) => {
     e.preventDefault();
@@ -421,7 +450,8 @@ const App = () => {
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {activeTab === 'dashboard' && <DashboardView stats={stats} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} monthOptions={monthOptions} students={students} setSelectedStatuses={setSelectedStatuses} setActiveTab={setActiveTab} setSelectedStatus={setSelectedStatus} />}
           {activeTab === 'leads' && <InquiriesView searchQuery={searchQuery} setSearchQuery={setSearchQuery} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} monthOptions={monthOptions} selectedStatuses={selectedStatuses} toggleStatusFilter={toggleStatusFilter} filteredLeads={filteredLeads} startEdit={startEdit} deleteLead={deleteLead} convertToStudent={convertToStudent} updateLeadStatus={updateLeadStatus} updateLeadRemarks={updateLeadRemarks} />}
-          {activeTab === 'students' && <StudentsView studentSearch={studentSearch} setStudentSearch={setStudentSearch} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} studentMonthOptions={studentMonthOptions} studentViewMode={studentViewMode} setStudentViewMode={setStudentViewMode} selectedStatus={selectedStatus} setSelectedStatus={setSelectedStatus} filteredStudents={filteredStudents} studentsTimelineEvents={studentsTimelineEvents} editStudent={editStudent} deleteStudent={deleteStudent} students={students} leads = {leads} />}
+          {activeTab === 'students' && <StudentsView studentSearch={studentSearch} setStudentSearch={setStudentSearch} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} studentMonthOptions={studentMonthOptions} studentViewMode={studentViewMode} setStudentViewMode={setStudentViewMode} selectedStatus={selectedStatus} setSelectedStatus={setSelectedStatus} filteredStudents={filteredStudents} studentsTimelineEvents={studentsTimelineEvents} editStudent={editStudent} deleteStudent={deleteStudent} students={students} leads={leads} />}
+          {activeTab === 'attendance' && <AttendanceView students={students} attendanceRecords={attendance} saveAttendance={saveAttendance} />}
           {activeTab === 'social' && (
             <div className="max-w-3xl mx-auto py-10">
               <div className="bg-indigo-600 p-12 rounded-[3.5rem] text-center mb-8 relative overflow-hidden">
