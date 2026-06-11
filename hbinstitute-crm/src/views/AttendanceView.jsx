@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Check, X, Clock, Save, Search, Calendar as CalendarIcon, Filter, Ban } from 'lucide-react';
 
-const AttendanceView = ({ students, attendanceRecords, saveAttendance }) => {
+const AttendanceView = ({ students, attendanceRecords, saveAttendance, globalMonth }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [dateFilterMode, setDateFilterMode] = useState('SingleDay'); // SingleDay, AllTime
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,6 +68,9 @@ const AttendanceView = ({ students, attendanceRecords, saveAttendance }) => {
 
     const currentStatus = localRecords[s.id] || 'Unmarked';
     const matchesStatus = statusFilter === 'All' || currentStatus === statusFilter;
+
+    // // 3. New Global Common Month Context Alignment Filter
+    // const matchesMonth = globalMonth === 'All' || s.month === globalMonth;
 
     return matchesSearch && matchesStatus;
   });

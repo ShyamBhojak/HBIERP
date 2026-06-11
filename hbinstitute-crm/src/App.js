@@ -15,6 +15,7 @@ import DashboardView from './views/DashboardView';
 import InquiriesView from './views/InquiriesView';
 import StudentsView from './views/StudentsView';
 import AttendanceView from './views/AttendanceView';
+import FeesView from './views/FeesView';
 
 const App = () => {
   const currentMonth = getCurrentMonthYear();
@@ -36,6 +37,7 @@ const App = () => {
   const [courseFilter] = useState('All');
   const [globalMonth, setGlobalMonth] = useState(currentMonth);
   const [attendance, setAttendance] = useState([]);
+  const [fees, setFees] = useState([]);
 
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -141,6 +143,17 @@ const App = () => {
     }, (err) => console.error(err));
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    const feesCollection = collection(db, 'artifacts', appId, 'public', 'data', 'fees');
+    return onSnapshot(feesCollection, (snapshot) => {
+      setFees(snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })));
+    }, (err) => console.error(err));
+  }, [user]);
+
   const saveAttendance = async (dailyKey, payload) => {
     try {
       const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'attendance', dailyKey);
@@ -157,6 +170,16 @@ const App = () => {
     }
   };
 
+  const saveFeePayment = async (txId, payload) => {
+    try {
+      const { setDoc } = await import('firebase/firestore');
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'fees', txId);
+      await setDoc(docRef, payload);
+    } catch (e) {
+      console.error("Fees transaction sync error:", e);
+    }
+
+  };
   const handleSaveLead = async (e) => {
     e.preventDefault();
     try {
@@ -196,7 +219,7 @@ const App = () => {
       }
       setShowStudentModal(false);
       setEditingStudent(null);
-      setNewStudent({ name: '', mobile: '', course: '', batchFrom: '', batchTo: '', joiningDate: '', status: 'Active' });
+      setNewStudent({ name: '', mobile: '', course: '', batchFrom: '', batchTo: '', joiningDate: '', status: 'Active', totalFee: '' });
     } catch (e) { console.error(e); }
   };
 
@@ -215,7 +238,7 @@ const App = () => {
   const editStudent = (student) => {
     setEditingStudent(student.id);
     setNewStudent({
-      name: student.name || '', mobile: student.mobile || '', course: student.course || '', batchTo: student.batchTo || '', batchFrom: student.batchFrom || '', status: student.status || 'Active',
+      name: student.name || '', mobile: student.mobile || '', course: student.course || '', batchTo: student.batchTo || '', batchFrom: student.batchFrom || '', status: student.status || 'Active', totalFee: student.totalFee || '',
       joiningDate: student.joiningDate?.seconds ? new Date(student.joiningDate.seconds * 1000).toISOString().split('T')[0] : ''
     });
     setShowStudentModal(true);
@@ -450,8 +473,9 @@ const App = () => {
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {activeTab === 'dashboard' && <DashboardView stats={stats} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} monthOptions={monthOptions} students={students} setSelectedStatuses={setSelectedStatuses} setActiveTab={setActiveTab} setSelectedStatus={setSelectedStatus} />}
           {activeTab === 'leads' && <InquiriesView searchQuery={searchQuery} setSearchQuery={setSearchQuery} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} monthOptions={monthOptions} selectedStatuses={selectedStatuses} toggleStatusFilter={toggleStatusFilter} filteredLeads={filteredLeads} startEdit={startEdit} deleteLead={deleteLead} convertToStudent={convertToStudent} updateLeadStatus={updateLeadStatus} updateLeadRemarks={updateLeadRemarks} />}
-          {activeTab === 'students' && <StudentsView studentSearch={studentSearch} setStudentSearch={setStudentSearch} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} studentMonthOptions={studentMonthOptions} studentViewMode={studentViewMode} setStudentViewMode={setStudentViewMode} selectedStatus={selectedStatus} setSelectedStatus={setSelectedStatus} filteredStudents={filteredStudents} studentsTimelineEvents={studentsTimelineEvents} editStudent={editStudent} deleteStudent={deleteStudent} students={students} leads={leads} attendanceRecords = {attendance}/>}
-          {activeTab === 'attendance' && <AttendanceView students={students} attendanceRecords={attendance} saveAttendance={saveAttendance} />}
+          {activeTab === 'students' && <StudentsView studentSearch={studentSearch} setStudentSearch={setStudentSearch} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} studentMonthOptions={studentMonthOptions} studentViewMode={studentViewMode} setStudentViewMode={setStudentViewMode} selectedStatus={selectedStatus} setSelectedStatus={setSelectedStatus} filteredStudents={filteredStudents} studentsTimelineEvents={studentsTimelineEvents} editStudent={editStudent} deleteStudent={deleteStudent} students={students} leads={leads} attendanceRecords={attendance} />}
+          {activeTab === 'attendance' && <AttendanceView students={students} attendanceRecords={attendance} saveAttendance={saveAttendance}/>}
+          {activeTab === 'fees' && <FeesView students={students} feesRecords={fees} saveFeePayment={saveFeePayment} globalMonth = {globalMonth}   /> }
           {activeTab === 'social' && (
             <div className="max-w-3xl mx-auto py-10">
               <div className="bg-indigo-600 p-12 rounded-[3.5rem] text-center mb-8 relative overflow-hidden">

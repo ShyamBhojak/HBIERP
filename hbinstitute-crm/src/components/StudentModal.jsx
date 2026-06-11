@@ -33,6 +33,16 @@ const StudentModal = ({ editingStudent, setShowStudentModal, setEditingStudent, 
               {COURSES.map(course => <option key={course} value={course}>{course}</option>)}
             </select>
           </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Total Course Fee (₹)</label>
+            <input
+              type="number"
+              placeholder="e.g. 15000"
+              value={newStudent.totalFee || ''}
+              onChange={(e) => setNewStudent({ ...newStudent, totalFee: e.target.value })}
+              className="w-full bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-green-600"
+            />
+          </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-2">
