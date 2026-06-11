@@ -16,6 +16,7 @@ import InquiriesView from './views/InquiriesView';
 import StudentsView from './views/StudentsView';
 import AttendanceView from './views/AttendanceView';
 import FeesView from './views/FeesView';
+import ConvertLeadModal from './components/ConvertLeadModal';
 
 const App = () => {
   const currentMonth = getCurrentMonthYear();
@@ -38,6 +39,8 @@ const App = () => {
   const [globalMonth, setGlobalMonth] = useState(currentMonth);
   const [attendance, setAttendance] = useState([]);
   const [fees, setFees] = useState([]);
+  const [conversionLead, setConversionLead] = useState(null);
+  const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
 
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -219,7 +222,7 @@ const App = () => {
       }
       setShowStudentModal(false);
       setEditingStudent(null);
-      setNewStudent({ name: '', mobile: '', course: '', batchFrom: '', batchTo: '', joiningDate: '', status: 'Active', totalFee: '' });
+      setNewStudent({ name: '', mobile: '', course: '', batchFrom: '', batchTo: '', joiningDate: '', status: 'Active', totalFee: '', discount: '' });
     } catch (e) { console.error(e); }
   };
 
@@ -238,26 +241,121 @@ const App = () => {
   const editStudent = (student) => {
     setEditingStudent(student.id);
     setNewStudent({
-      name: student.name || '', mobile: student.mobile || '', course: student.course || '', batchTo: student.batchTo || '', batchFrom: student.batchFrom || '', status: student.status || 'Active', totalFee: student.totalFee || '',
+      name: student.name || '', mobile: student.mobile || '', course: student.course || '', batchTo: student.batchTo || '', batchFrom: student.batchFrom || '', status: student.status || 'Active', totalFee: student.totalFee || '', discount: student.discount || '',
       joiningDate: student.joiningDate?.seconds ? new Date(student.joiningDate.seconds * 1000).toISOString().split('T')[0] : ''
     });
     setShowStudentModal(true);
   };
 
   const deleteStudent = async (id) => {
-    if (!window.confirm('Delete this student?')) return;
-    try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', id)); } catch (e) { console.error(e); }
+    if (!window.confirm('Are you sure you want to delete this student record? This will reset their inquiry conversion status.')) return;
+
+    try {
+      const { deleteDoc, doc, updateDoc, deleteField } = await import('firebase/firestore');
+
+      // 1. Find the target student object in your local state array to grab their leadId link
+      const studentToRemoval = students.find(s => s.id === id);
+
+      // 2. Execute the primary removal of the student document file
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', id));
+
+      // 3. SYNCHRONIZATION STEP: If this student came from a converted lead pipeline, patch the lead
+      if (studentToRemoval && studentToRemoval.leadId) {
+        const originalLead = leads.find(l => l.id === studentToRemoval.leadId);
+
+        if (originalLead) {
+          const currentStatuses = Array.isArray(originalLead.status) ? originalLead.status : [originalLead.status];
+
+          // Cleanly filter out 'Converted' from the tracking array array list
+          const restoredStatuses = currentStatuses.filter(st => st !== 'Converted');
+
+          const leadDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'leads', studentToRemoval.leadId);
+
+          // Reset the lead states and clear out the execution timestamp map path
+          await updateDoc(leadDocRef, {
+            status: restoredStatuses,
+            convertedAt: deleteField(),             // Wipes out conversion timestamp completely
+            [`statusHistory.Converted`]: deleteField() // Strips out the history log tracker key path
+          });
+        }
+      }
+
+      alert("Student profile removed successfully. Inquiry conversion trigger has been reset!");
+    } catch (e) {
+      console.error("Critical Student Deletion Sync Failure Exception:", e);
+      alert("Failed to sync status during deletion. Check dev console logs.");
+    }
   };
 
-  const convertToStudent = async (lead) => {
+  const convertToStudent = (lead) => {
+    // Open the confirmation modal instead of pushing to database instantly
+    setConversionLead(lead);
+    setIsConvertModalOpen(true);
+  };
+
+  const handleExecuteConversion = async (additionalDetails) => {
+    if (!conversionLead) return;
+
     try {
-      const studentsCollection = collection(db, 'artifacts', appId, 'public', 'data', 'students');
-      await addDoc(studentsCollection, {
-        leadId: lead.id, name: lead.name, mobile: lead.phone, course: lead.course, joiningDate: serverTimestamp(), status: 'Active',
-        statusHistory: { 'Active': new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+      const { setDoc, doc, updateDoc, serverTimestamp, Timestamp } = await import('firebase/firestore');
+
+      const studentId = `student_${Date.now()}`;
+      const parsedDate = new Date(additionalDetails.joiningDate);
+      const targetMonth = parsedDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+      const cleanFee = String(additionalDetails.totalFee || '0').replace(/[^0-9]/g, '');
+      const cleanDiscount = String(additionalDetails.discount || '0').replace(/[^0-9]/g, '');
+
+      // 1. Compile the student registration profile payload
+      const studentPayload = {
+        id: studentId,
+        leadId: String(conversionLead.id),
+        name: String(conversionLead.name),
+        mobile: String(conversionLead.mobile),
+        course: String(conversionLead.course || 'N/A'),
+        status: 'Active',
+        month: String(targetMonth),
+        totalFee: Number(cleanFee) || 0,
+        discount: Number(cleanDiscount) || 0,
+        batchFrom: String(additionalDetails.batchFrom || 'Not Assigned'),
+        batchTo: String(additionalDetails.batchTo || 'Not Assigned'),
+        joiningDate: Timestamp.fromDate(parsedDate),
+        createdAt: serverTimestamp(),
+        statusHistory: {
+          Active: parsedDate.toLocaleDateString('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric'
+          }) + ' at 00:00:00 UTC'
+        }
+      };
+
+      // 2. Write the new student file tracking document
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', studentId), studentPayload);
+
+      // 3. FIX: Read your current array list structure safely
+      const currentStatuses = Array.isArray(conversionLead.status) ? conversionLead.status : [conversionLead.status];
+
+      // Prevent duplicate appending if the user clicks convert multiple times
+      const updatedStatuses = currentStatuses.includes('Converted')
+        ? currentStatuses
+        : [...currentStatuses, 'Converted'];
+
+      const logDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+      // 4. Update the existing lead document cleanly without erasing other statuses
+      const leadDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'leads', conversionLead.id);
+      await updateDoc(leadDocRef, {
+        status: updatedStatuses,
+        convertedAt: serverTimestamp(),
+        [`statusHistory.Converted`]: logDate // Write execution timestamp history directly to history map log
       });
-      alert('Student enrolled successfully!');
-    } catch (e) { console.error(e); }
+
+      alert(`Success! ${conversionLead.name} converted to an active enrolled student.`);
+      setIsConvertModalOpen(false);
+      setConversionLead(null);
+    } catch (e) {
+      console.error("Critical Firestore Pipeline Exception Log:", e);
+      alert("Conversion pipeline write failed. Check dev logs.");
+    }
   };
 
   const deleteLead = async (id) => {
@@ -266,7 +364,7 @@ const App = () => {
     }
   };
 
-  const updateLeadStatus = async (leadId, currentStatuses = [], clickedStatus) => {
+const updateLeadStatus = async (leadId, currentStatuses = [], clickedStatus) => {
     try {
       const statusArray = Array.isArray(currentStatuses) ? currentStatuses : [currentStatuses];
       let updatedStatuses;
@@ -274,16 +372,35 @@ const App = () => {
       const logDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
       if (statusArray.includes(clickedStatus)) {
+        // 1. If clicking a status that is ALREADY active, remove it
         updatedStatuses = statusArray.filter(st => st !== clickedStatus);
         updates[`statusHistory.${clickedStatus}`] = deleteField();
+
+        // Safety synchronization: If manually removing 'Enrolled', also strip 'Converted' tags
+        if (clickedStatus === 'Enrolled') {
+          updatedStatuses = updatedStatuses.filter(st => st !== 'Converted');
+          updates[`statusHistory.Converted`] = deleteField();
+          updates.convertedAt = deleteField();
+        }
       } else {
+        // 2. If activating a NEW status badge
         updatedStatuses = [...statusArray, clickedStatus];
         updates[`statusHistory.${clickedStatus}`] = logDate;
+
+        // FIX: If re-activating 'Enrolled' for an inquiry that isn't currently converted,
+        // force-clear any old leftover historical 'Converted' keys from previous deleted records.
+        if (clickedStatus === 'Enrolled' && !statusArray.includes('Converted')) {
+          updates[`statusHistory.Converted`] = deleteField();
+          updates.convertedAt = deleteField();
+        }
       }
+      
       updates.status = updatedStatuses;
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leads', leadId), updates);
-    } catch (e) { console.error(e); }
-  };
+    } catch (e) { 
+      console.error("Inquiry status history patch sync exception:", e); 
+    }
+  };  
 
   const updateLeadRemarks = async (leadId, val) => {
     try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leads', leadId), { remarks: val }); } catch (e) { console.error(e); }
@@ -298,8 +415,12 @@ const App = () => {
       const matchesSearch = l.name?.toLowerCase().includes(searchQuery.toLowerCase()) || l.phone?.includes(searchQuery) || l.course?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesMonth = globalMonth === 'All' || l.month === globalMonth;
       const leadStatusArray = Array.isArray(l.status) ? l.status : [l.status];
+
+      // REVISED FILTER LOGIC: If no specific filter button row is active, show everything.
+      // If a filter button is clicked, match that specific status option properly.
       const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.some(s => leadStatusArray.includes(s));
       const matchesCourse = courseFilter === 'All' || l.course === courseFilter;
+
       return matchesSearch && matchesMonth && matchesStatus && matchesCourse;
     });
   }, [leads, searchQuery, globalMonth, selectedStatuses, courseFilter]);
@@ -473,9 +594,9 @@ const App = () => {
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {activeTab === 'dashboard' && <DashboardView stats={stats} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} monthOptions={monthOptions} students={students} setSelectedStatuses={setSelectedStatuses} setActiveTab={setActiveTab} setSelectedStatus={setSelectedStatus} />}
           {activeTab === 'leads' && <InquiriesView searchQuery={searchQuery} setSearchQuery={setSearchQuery} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} monthOptions={monthOptions} selectedStatuses={selectedStatuses} toggleStatusFilter={toggleStatusFilter} filteredLeads={filteredLeads} startEdit={startEdit} deleteLead={deleteLead} convertToStudent={convertToStudent} updateLeadStatus={updateLeadStatus} updateLeadRemarks={updateLeadRemarks} />}
-          {activeTab === 'students' && <StudentsView studentSearch={studentSearch} setStudentSearch={setStudentSearch} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} studentMonthOptions={studentMonthOptions} studentViewMode={studentViewMode} setStudentViewMode={setStudentViewMode} selectedStatus={selectedStatus} setSelectedStatus={setSelectedStatus} filteredStudents={filteredStudents} studentsTimelineEvents={studentsTimelineEvents} editStudent={editStudent} deleteStudent={deleteStudent} students={students} leads={leads} attendanceRecords={attendance} feesRecords = {fees} />}
-          {activeTab === 'attendance' && <AttendanceView students={students} attendanceRecords={attendance} saveAttendance={saveAttendance}/>}
-          {activeTab === 'fees' && <FeesView students={students} feesRecords={fees} saveFeePayment={saveFeePayment} globalMonth = {globalMonth}   /> }
+          {activeTab === 'students' && <StudentsView studentSearch={studentSearch} setStudentSearch={setStudentSearch} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} studentMonthOptions={studentMonthOptions} studentViewMode={studentViewMode} setStudentViewMode={setStudentViewMode} selectedStatus={selectedStatus} setSelectedStatus={setSelectedStatus} filteredStudents={filteredStudents} studentsTimelineEvents={studentsTimelineEvents} editStudent={editStudent} deleteStudent={deleteStudent} students={students} leads={leads} attendanceRecords={attendance} feesRecords={fees} />}
+          {activeTab === 'attendance' && <AttendanceView students={students} attendanceRecords={attendance} saveAttendance={saveAttendance} />}
+          {activeTab === 'fees' && <FeesView students={students} feesRecords={fees} saveFeePayment={saveFeePayment} globalMonth={globalMonth} />}
           {activeTab === 'social' && (
             <div className="max-w-3xl mx-auto py-10">
               <div className="bg-indigo-600 p-12 rounded-[3.5rem] text-center mb-8 relative overflow-hidden">
@@ -498,6 +619,13 @@ const App = () => {
 
       {isAddingLead && <LeadModal editingLead={editingLead} closeLeadModal={closeLeadModal} handleSaveLead={handleSaveLead} newLead={newLead} setNewLead={setNewLead} />}
       {showStudentModal && <StudentModal editingStudent={editingStudent} setShowStudentModal={setShowStudentModal} setEditingStudent={setEditingStudent} newStudent={newStudent} setNewStudent={setNewStudent} saveStudent={saveStudent} />}
+      {/* Target rendering injection overlays hooks inside App.js */}
+      <ConvertLeadModal
+        isOpen={isConvertModalOpen}
+        onClose={() => { setIsConvertModalOpen(false); setConversionLead(null); }}
+        lead={conversionLead}
+        onConfirm={handleExecuteConversion}
+      />
     </div>
   );
 };

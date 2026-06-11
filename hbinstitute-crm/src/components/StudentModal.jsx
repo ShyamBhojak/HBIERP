@@ -43,6 +43,17 @@ const StudentModal = ({ editingStudent, setShowStudentModal, setEditingStudent, 
               className="w-full bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-green-600"
             />
           </div>
+          {/* NEW: Dynamic Discount Entry Field */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Discount Allowed (₹)</label>
+            <input
+              type="number"
+              placeholder="e.g. 2000"
+              value={newStudent.discount || ''}
+              onChange={(e) => setNewStudent({ ...newStudent, discount: e.target.value })}
+              className="w-full bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl px-6 py-4 text-xs font-semibold outline-none focus:ring-2 focus:ring-indigo-600"
+            />
+          </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-2">

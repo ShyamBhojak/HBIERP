@@ -36,11 +36,10 @@ const InquiriesView = ({ searchQuery, setSearchQuery, globalMonth, setGlobalMont
           <button
             key={status}
             onClick={() => toggleStatusFilter(status)}
-            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase transition-all border ${
-              selectedStatuses.includes(status)
-                ? 'bg-indigo-600 border-indigo-500 text-white'
-                : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-500'
-            }`}
+            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase transition-all border ${selectedStatuses.includes(status)
+              ? 'bg-indigo-600 border-indigo-500 text-white'
+              : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-500'
+              }`}
           >
             {status}
           </button>
@@ -75,10 +74,18 @@ const InquiriesView = ({ searchQuery, setSearchQuery, globalMonth, setGlobalMont
                   <button onClick={() => deleteLead(lead.id)} className="p-3 bg-gray-800 hover:bg-red-500/20 text-red-400 rounded-xl transition-all">
                     <Trash2 size={18} />
                   </button>
-                  {leadStatusArray.includes('Enrolled') && (
-                    <button onClick={() => convertToStudent(lead)} className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-bold">
+                  {/* REVISED: Render Convert option ONLY if 'Enrolled' is active AND 'Converted' has not been assigned yet */}
+                  {leadStatusArray.includes('Enrolled') && !leadStatusArray.includes('Converted') && (
+                    <button onClick={() => convertToStudent(lead)} className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-bold transition-all whitespace-nowrap">
                       Convert To Student
                     </button>
+                  )}
+
+                  {/* REVISED: Show the enrollment confirmation badge ONLY if BOTH 'Enrolled' and 'Converted' tags are present */}
+                  {leadStatusArray.includes('Enrolled') && leadStatusArray.includes('Converted') && (
+                    <span className="px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-black uppercase tracking-wider whitespace-nowrap">
+                      🎉 Student Enrolled
+                    </span>
                   )}
                 </div>
 
@@ -90,9 +97,8 @@ const InquiriesView = ({ searchQuery, setSearchQuery, globalMonth, setGlobalMont
                       <button
                         key={st}
                         onClick={() => updateLeadStatus(lead.id, lead.status, st)}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex flex-col items-center justify-center gap-0.5 min-w-[90px] ${
-                          isActive ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-50 dark:bg-gray-900'
-                        }`}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex flex-col items-center justify-center gap-0.5 min-w-[90px] ${isActive ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-50 dark:bg-gray-900'
+                          }`}
                       >
                         <span>{st}</span>
                         {isActive && statusTimestamp && (
