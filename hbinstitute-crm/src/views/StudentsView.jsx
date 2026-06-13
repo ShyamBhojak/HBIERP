@@ -501,24 +501,30 @@ const StudentsView = ({ studentSearch, setStudentSearch, globalMonth, setGlobalM
       </html>
     `;
 
-    // Standard hidden print frame pipeline context pattern execution
-    const printFrame = document.createElement('iframe');
-    printFrame.style.position = 'fixed';
-    printFrame.style.width = '0';
-    printFrame.style.height = '0';
-    printFrame.style.border = '0';
-    document.body.appendChild(printFrame);
 
-    const docRef = printFrame.contentWindow.document;
-    docRef.open();
-    docRef.write(htmlCertificateContent);
-    docRef.close();
+    //   const printFrame = document.createElement('iframe');
+    //   printFrame.style.position = 'fixed';
+    //   printFrame.style.width = '0';
+    //   printFrame.style.height = '0';
+    //   printFrame.style.border = '0';
+    //   document.body.appendChild(printFrame);
+    //   const docRef = printFrame.contentWindow.document;
+    //   docRef.open();
+    //   docRef.write(htmlCertificateContent);
+    //   docRef.close();
+    //   setTimeout(() => {
+    //     printFrame.contentWindow.focus();
+    //     printFrame.contentWindow.print();
+    //     setTimeout(() => { document.body.removeChild(printFrame); }, 3000);
+    //   }, 250);
+    const blob = new Blob(
+      [htmlCertificateContent],
+      { type: 'text/html' }
+    );
 
-    setTimeout(() => {
-      printFrame.contentWindow.focus();
-      printFrame.contentWindow.print();
-      setTimeout(() => { document.body.removeChild(printFrame); }, 1200);
-    }, 400);
+    const url = URL.createObjectURL(blob);
+
+    window.open(url, '_blank');
   };
   return (
     <div className="space-y-6">

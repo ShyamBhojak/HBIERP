@@ -17,6 +17,7 @@ import StudentsView from './views/StudentsView';
 import AttendanceView from './views/AttendanceView';
 import FeesView from './views/FeesView';
 import ConvertLeadModal from './components/ConvertLeadModal';
+import BatchesView from './views/BatchesView';
 
 const App = () => {
   const currentMonth = getCurrentMonthYear();
@@ -535,6 +536,7 @@ const updateLeadStatus = async (leadId, currentStatuses = [], clickedStatus) => 
     else if (activeTab === 'students') exportToCSV(filteredStudents, 'HB_Students');
     else alert("Nothing to export.");
   };
+  
 
   if (authLoading) return <div className="h-screen bg-white dark:bg-gray-950 flex items-center justify-center text-indigo-500 font-bold">Initializing CRM...</div>;
 
@@ -597,6 +599,7 @@ const updateLeadStatus = async (leadId, currentStatuses = [], clickedStatus) => 
           {activeTab === 'students' && <StudentsView studentSearch={studentSearch} setStudentSearch={setStudentSearch} globalMonth={globalMonth} setGlobalMonth={setGlobalMonth} studentMonthOptions={studentMonthOptions} studentViewMode={studentViewMode} setStudentViewMode={setStudentViewMode} selectedStatus={selectedStatus} setSelectedStatus={setSelectedStatus} filteredStudents={filteredStudents} studentsTimelineEvents={studentsTimelineEvents} editStudent={editStudent} deleteStudent={deleteStudent} students={students} leads={leads} attendanceRecords={attendance} feesRecords={fees} />}
           {activeTab === 'attendance' && <AttendanceView students={students} attendanceRecords={attendance} saveAttendance={saveAttendance} />}
           {activeTab === 'fees' && <FeesView students={students} feesRecords={fees} saveFeePayment={saveFeePayment} globalMonth={globalMonth} />}
+          {activeTab === 'batches' && <BatchesView students={students} />}
           {activeTab === 'social' && (
             <div className="max-w-3xl mx-auto py-10">
               <div className="bg-indigo-600 p-12 rounded-[3.5rem] text-center mb-8 relative overflow-hidden">
