@@ -605,7 +605,10 @@ const StudentsView = ({ studentSearch, setStudentSearch, globalMonth, setGlobalM
                         </div>
                       </div>
                     </div>
-                    <div><p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Email</p><p className="font-semibold text-sm">{student.email || "N/A"}</p></div>
+                    <div className="pt-1">
+                      <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Google Email Account</p>
+                      <p className="font-bold text-xs text-indigo-600 dark:text-indigo-400 break-all mt-0.5">{student.email || "No email assigned"}</p>
+                    </div>
 
                     <div>
                       <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Batch Timing</p>

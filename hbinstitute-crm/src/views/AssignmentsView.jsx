@@ -1,10 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Search, FileText, Calendar, BookOpen, Trash2, CheckCircle, Clock } from 'lucide-react';
-// import { formatLongDate } from '../utils/helpers';
+import { Search, FileText, Calendar, BookOpen, Trash2, CheckCircle, Clock, User } from 'lucide-react';
 
 const AssignmentsView = ({ assignments, students, deleteAssignment, setIsAddingAssignment, updateSubmissionStatus }) => {
   const [searchQuery, setSearchQuery] = useState('');
-//   const [statusFilter, setStatusFilter] = useState('All');
 
   // Compute live analytical overview counts
   const metrics = useMemo(() => {
@@ -29,7 +27,8 @@ const AssignmentsView = ({ assignments, students, deleteAssignment, setIsAddingA
   const filteredAssignments = useMemo(() => {
     return assignments.filter(a => {
       const matchesSearch = a.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            a.course?.toLowerCase().includes(searchQuery.toLowerCase());
+                            a.course?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            a.facultyName?.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesSearch;
     });
   }, [assignments, searchQuery]);
@@ -60,7 +59,7 @@ const AssignmentsView = ({ assignments, students, deleteAssignment, setIsAddingA
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
           <input 
             type="text" 
-            placeholder="Search by assignment title or targeted course..." 
+            placeholder="Search by title, targeted course, or instructor..." 
             value={searchQuery} 
             onChange={e => setSearchQuery(e.target.value)} 
             className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl pl-10 pr-4 py-3 text-xs font-semibold outline-none" 
@@ -77,8 +76,13 @@ const AssignmentsView = ({ assignments, students, deleteAssignment, setIsAddingA
       {/* Assignments Render Grid Stack */}
       <div className="space-y-4">
         {filteredAssignments.map((task) => {
-          // Track assigned students belonging to this specific course module
-          const courseStudents = students.filter(s => s.status === 'Active' && s.course === task.course);
+          // FIXED CRITERIA: Intersect Active state + Course Match + Batch Time Slot Match
+          const courseStudents = students.filter(s => {
+            const studentCourses = s.courses || (s.course ? [s.course] : []);
+            const matchesCourse = studentCourses.includes(task.course);
+            const studentSlot = `${s.batchFrom} - ${s.batchTo}`;
+            return s.status === 'Active' && matchesCourse && studentSlot === task.batchSlot;
+          });
 
           return (
             <div key={task.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-[2rem] p-6 shadow-sm">
@@ -91,12 +95,16 @@ const AssignmentsView = ({ assignments, students, deleteAssignment, setIsAddingA
                     <span className="text-[9px] font-black bg-indigo-500/10 text-indigo-500 px-2.5 py-1 rounded-md uppercase tracking-wider">
                       {task.course}
                     </span>
+                    <span className="text-[9px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-md uppercase tracking-wider flex items-center gap-1">
+                      <Clock size={10} /> {task.batchSlot || 'Flexible'}
+                    </span>
                   </div>
                   <p className="text-xs text-gray-500 leading-relaxed font-medium">{task.description}</p>
                   
-                  <div className="flex gap-4 text-[11px] text-gray-400 font-bold pt-2">
+                  <div className="flex flex-wrap gap-4 text-[11px] text-gray-400 font-bold pt-2">
+                    <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400"><User size={13}/> Instructor: {task.facultyName || 'N/A'}</span>
                     <span className="flex items-center gap-1.5"><Calendar size={13}/> Deadline: {task.dueDate}</span>
-                    <span className="flex items-center gap-1.5"><BookOpen size={13}/> Assigned: {courseStudents.length} Students</span>
+                    <span className="flex items-center gap-1.5"><BookOpen size={13}/> Targeted: {courseStudents.length} Students in Slot</span>
                   </div>
                 </div>
 
@@ -144,7 +152,7 @@ const AssignmentsView = ({ assignments, students, deleteAssignment, setIsAddingA
                     );
                   })}
                   {courseStudents.length === 0 && (
-                    <p className="text-[11px] text-gray-400 italic font-medium py-1">No active students enrolled in this course stream.</p>
+                    <p className="text-[11px] text-gray-400 italic font-medium py-1">No active students found matching this batch runtime slot.</p>
                   )}
                 </div>
               </div>

@@ -887,7 +887,15 @@ const App = () => {
         faculty={faculty} // <-- Ensure this is passed
       />
       {isAddingFaculty && <FacultyModal editingFaculty={editingFaculty} closeFacultyModal={closeFacultyModal} handleSaveFaculty={handleSaveFaculty} newFaculty={newFaculty} setNewFaculty={setNewFaculty} />}
-      {isAddingAssignment && <AssignmentModal closeAssignmentModal={() => setIsAddingAssignment(false)} handleSaveAssignment={handleSaveAssignment} />}
+      {/* Synchronized state bridge mapping array parameters */}
+      {isAddingAssignment && (
+        <AssignmentModal
+          closeAssignmentModal={() => setIsAddingAssignment(false)}
+          handleSaveAssignment={handleSaveAssignment}
+          faculty={faculty}
+          students={students}
+        />
+      )}
       {isAddingSession && (
         <SessionUpdateModal
           closeSessionModal={closeSessionModal}
