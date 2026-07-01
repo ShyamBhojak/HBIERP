@@ -132,7 +132,7 @@ const StudentsView = ({ studentSearch, setStudentSearch, globalMonth, setGlobalM
                           {(student.courses || []).map((course, idx) => {
                             const courseName = typeof course === 'object' ? course.name : course;
                             return (
-                              <span key={idx} className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-md font-bold text-xs border border-indigo-200/40 dark:border-indigo-500/10 uppercase tracking-wide">
+                              <span key={idx} className="px-2 py-0.5 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wide">
                                 {courseName}
                               </span>
                             );
