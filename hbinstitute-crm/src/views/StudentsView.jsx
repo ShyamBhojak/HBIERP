@@ -10,6 +10,16 @@ import { downloadStatementReceipt } from '../utils/statementPrinter';
 
 const StudentsView = ({ studentSearch, setStudentSearch, globalMonth, setGlobalMonth, studentMonthOptions, studentViewMode, setStudentViewMode, selectedStatus, setSelectedStatus, filteredStudents, studentsTimelineEvents, editStudent, deleteStudent, students, leads, attendanceRecords = [], feesRecords = [] }) => {
 
+  // Centralized Chronological Sorting Filter (Newest Enrolments First)
+  const sortedFilteredStudents = useMemo(() => {
+    if (!filteredStudents || filteredStudents.length === 0) return [];
+    return [...filteredStudents].sort((a, b) => {
+      const timestampA = a.joiningDate?.seconds || 0;
+      const timestampB = b.joiningDate?.seconds || 0;
+      return timestampB - timestampA; // Descending order (newest timestamp wins)
+    });
+  }, [filteredStudents]);
+
   const studentAttendanceMetrics = useMemo(() => {
     const metrics = {};
     attendanceRecords.forEach(sheet => {
@@ -58,479 +68,6 @@ const StudentsView = ({ studentSearch, setStudentSearch, globalMonth, setGlobalM
     return events.sort((a, b) => a.timestamp - b.timestamp);
   };
 
-  // const downloadStudentStatementPDF = (student, totalFee, paid, balance) => {
-  //   const studentHistory = feesRecords.filter(tx => tx.studentId === student.id).sort((a, b) => new Date(a.date) - new Date(b.date));
-  //   const cleanStudentName = student.name.replace(/\s+/g, '_');
-  //   const discount = Number(student.discount) || 0;
-
-  //   // Cache the absolute master title state from your App context
-  //   const originalAppTitle = window.document.title;
-
-  //   // FORCE ENFORCEMENT STEP 1: Overwrite root window parameters instantly 
-  //   // to bypass edge print pipeline isolation loops
-  //   window.document.title = `${cleanStudentName}_Fees_Statement`;
-
-  //   const htmlInvoiceContent = `
-  //     <html>
-  //       <head>
-  //         <title>${cleanStudentName}_Fees_Statement</title>
-  //         <style>
-  //           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
-  //           * { box-sizing: border-box; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
-  //           body { background: #ffffff; color: #1e293b; padding: 40px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  //           .receipt-frame { border: 2px solid #e2e8f0; border-radius: 24px; padding: 40px; max-width: 700px; margin: 0 auto; position: relative; }
-  //           .header-strip { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #e2e8f0; padding-bottom: 24px; margin-bottom: 24px; }
-  //           .brand-title { font-size: 24px; font-weight: 900; letter-spacing: -0.03em; color: #4f46e5; text-transform: uppercase; }
-  //           .brand-subtitle { font-size: 11px; font-weight: 700; color: #64748b; tracking: 0.05em; text-transform: uppercase; margin-top: 2px; }
-  //           .brand-contact { font-size: 11px; color: #64748b; line-height: 1.5; font-weight: 500; margin-top: 6px; max-width: 320px; }
-  //           .invoice-label { font-size: 20px; font-weight: 900; text-transform: uppercase; text-align: right; color: #0f172a; }
-  //           .meta-grid { display: flex; justify-content: space-between; margin-bottom: 30px; }
-  //           .meta-block p { font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 4px; }
-  //           .meta-block h4 { font-size: 15px; color: #0f172a; font-weight: 800; text-transform: uppercase; }
-  //           .table-box { width: 100%; border-collapse: collapse; margin-bottom: 20px; text-align: left; }
-  //           .table-box th { background: #f8fafc; padding: 12px 16px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #e2e8f0; }
-  //           .table-box td { padding: 16px; font-size: 13px; font-weight: 600; color: #334155; border-bottom: 1px solid #f1f5f9; }
-  //           .closing-block { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 24px; }
-  //           .summary-box { background: #f8fafc; border-radius: 18px; padding: 20px; width: 340px; }
-  //           .summary-row { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #64748b; padding: 5px 0; }
-  //           .summary-row.discount-row { color: #dc2626; font-weight: 700; }
-  //           .summary-row.total-row { border-top: 1px solid #e2e8f0; padding-top: 10px; margin-top: 6px; font-size: 15px; font-weight: 900; color: #4f46e5; }
-  //           .signatory-container { text-align: center; width: 220px; }
-  //           .signatory-image { width: 160px; height: auto; display: block; margin: 0 auto -5px auto; mix-blend-mode: multiply; }
-  //           .signatory-line { border-top: 1px solid #cbd5e1; margin-top: 5px; padding-top: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; tracking: 0.05em; color: #475569; }
-  //           .footer-msg { text-align: center; margin-top: 40px; font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
-  //         </style>
-  //       </head>
-  //       <body>
-  //         <div class="receipt-frame">
-  //           <div class="header-strip">
-  //             <div>
-  //               <h1 class="brand-title">H.B.INSTITUTE</h1>
-  //               <p class="brand-subtitle">The Training Center</p>
-  //               <p class="brand-contact">
-  //                 West Gate Shops & Corporate Offices, A-221, 150 Ft. Ring Road, Raiya Road, Rajkot - 360005<br/>
-  //                 Call: +91 94844 33960 | inquiry@hbinstitute.co.in<br/>
-  //                 Web: www.hbinstitute.co.in
-  //               </p>
-  //             </div>
-  //             <div>
-  //               <h2 class="invoice-label">Fees Ledger Statement</h2>
-  //               <p style="font-size:12px; font-weight:700; color:#64748b; text-align:right; margin-top:4px;">As of: ${new Date().toLocaleDateString('en-GB')}</p>
-  //             </div>
-  //           </div>
-
-  //           <div class="meta-grid">
-  //             <div class="meta-block">
-  //               <p>Student Name</p>
-  //               <h4>${student.name}</h4>
-  //               <span style="font-size:11px; font-weight:600; color:#94a3b8;">Course: ${student.course}</span>
-  //             </div>
-  //             <div class="meta-block" style="text-align: right;">
-  //               <p>Account Metadata</p>
-  //               <h4>ID: ${student.id.slice(0, 8).toUpperCase()}</h4>
-  //               <span style="font-size:11px; font-weight:600; color:#94a3b8;">Mobile: ${student.mobile || 'N/A'}</span>
-  //             </div>
-  //           </div>
-
-  //           <p style="font-size: 11px; font-weight: 900; text-transform: uppercase; color: #64748b; tracking: 0.05em; margin-bottom: 10px;">Itemized Installment Transactions</p>
-  //           <table class="table-box">
-  //             <thead>
-  //               <tr>
-  //                 <th>Date</th>
-  //                 <th>Method</th>
-  //                 <th>Remarks/Ref</th>
-  //                 <th style="text-align: right;">Amount</th>
-  //               </tr>
-  //             </thead>
-  //             <tbody>
-  //               ${studentHistory.map(tx => `
-  //                 <tr>
-  //                   <td>${tx.date ? tx.date.split('-').reverse().join('/') : 'N/A'}</td>
-  //                   <td>${tx.mode || 'Cash'}</td>
-  //                   <td style="color:#64748b; font-size:12px;">${tx.remarks || 'Installment Entry'}</td>
-  //                   <td style="text-align: right; font-weight: 800;">₹${Number(tx.amount).toLocaleString('en-IN')}.00</td>
-  //                 </tr>
-  //               `).join('')}
-  //             </tbody>
-  //           </table>
-
-  //           <div class="closing-block">
-  //             <div class="signatory-container">
-  //             <img src="${signatory}" alt="" width="293" height="50" class="signatory-image" alt="Authorized Signatory Seal" />               <div class="signatory-line">Authorized Signatory</div>
-  //             </div>
-
-  //             <div class="summary-box">
-  //               <div class="summary-row"><span>Gross Course Fee</span><span>₹${totalFee.toLocaleString('en-IN')}.00</span></div>
-  //               <div class="summary-row discount-row"><span>Discount Allowed (-)</span><span>₹${discount.toLocaleString('en-IN')}.00</span></div>
-  //               <div class="summary-row" style="border-top: 1px solid #f1f5f9; padding-top: 6px; font-weight: 700; color: #0f172a;"><span>Net Payable Fee</span><span>₹${(totalFee - discount).toLocaleString('en-IN')}.00</span></div>
-  //               <div class="summary-row"><span>Total Paid Collections</span><span style="color:#16a34a; font-weight:700;">₹${paid.toLocaleString('en-IN')}.00</span></div>
-  //               <div class="summary-row total-row"><span>Outstanding Dues</span><span>₹${balance.toLocaleString('en-IN')}.00</span></div>
-  //             </div>
-  //           </div>
-
-  //           <div class="footer-msg">Thank you for learning with us!</div>
-  //         </div>
-  //         <script>
-  //           window.onload = function() { window.print(); };
-  //         </style>
-  //       </body>
-  //     </html>
-  //   `;
-
-  //   const printFrame = document.createElement('iframe');
-  //   printFrame.style.position = 'fixed';
-  //   printFrame.style.width = '0';
-  //   printFrame.style.height = '0';
-  //   printFrame.style.border = '0';
-  //   document.body.appendChild(printFrame);
-
-  //   const docRef = printFrame.contentWindow.document;
-  //   docRef.open();
-  //   docRef.write(htmlInvoiceContent);
-  //   docRef.close();
-
-  //   setTimeout(() => {
-  //     printFrame.contentWindow.focus();
-  //     printFrame.contentWindow.print();
-
-  //     // FORCE ENFORCEMENT STEP 2: Restore the exact main system tab header title 
-  //     // immediately after the browser hands off control to the local print pipeline
-  //     window.document.title = originalAppTitle;
-
-  //     setTimeout(() => {
-  //       document.body.removeChild(printFrame);
-  //     }, 1000);
-  //   }, 250);
-  // };
-
-  // const downloadCertificate = (student) => {
-  //   const cleanStudentName = student.name.replace(/\s+/g, '_');
-  //   const certificateNo = student.id.toUpperCase();
-  //   // 1. Isolate the completion raw text entry string
-  //   let rawTargetDate = '';
-  //   if (student.statusHistory && student.statusHistory['Completed']) {
-  //     rawTargetDate = student.statusHistory['Completed'];
-  //   } else if (student.joiningDate?.seconds) {
-  //     rawTargetDate = student.joiningDate.seconds * 1000;
-  //   }
-
-  //   // 2. Format explicitly to: Weekday Month Name dd, yyyy
-  //   let completionDateStr = '';
-  //   if (rawTargetDate) {
-  //     // Clean string mutations (e.g., strips " at 10:47 PM")
-  //     let cleanStr = String(rawTargetDate).replace(/\s+/g, ' ').replace(/,+/g, '').replace(/-/g, ' ').split(' at ')[0];
-  //     const parsedDate = new Date(cleanStr);
-
-  //     if (!isNaN(parsedDate.getTime())) {
-  //       // Enforce specific token configurations matching your template rule
-  //       const options = { weekday: 'long', month: 'long', day: '2-digit', year: 'numeric' };
-  //       // Output format example: "Friday June 12, 2026"
-  //       completionDateStr = parsedDate.toLocaleDateString('en-US', options).replace(/,/g, '');
-  //     } else {
-  //       // Fallback default format layout
-  //       completionDateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: '2-digit', year: 'numeric' }).replace(/,/g, '');
-  //     }
-  //   } else {
-  //     completionDateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: '2-digit', year: 'numeric' }).replace(/,/g, '');
-  //   }
-
-  //   const htmlCertificateContent = `
-  //     <html>
-  //       <head>
-  //         <title>${cleanStudentName}_Certificate</title>
-  //         <style>
-  //           @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-
-  //           * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  //           @page {
-  //             size: landscape;
-  //             margin: 0;
-  //           }
-
-  //           body { 
-  //             background: #ffffff; 
-  //             display: flex; 
-  //             justify-content: center; 
-  //             align-items: center; 
-  //             height: 100vh;
-  //             width: 100vw;
-  //             font-family: 'Montserrat', sans-serif;
-  //             -webkit-print-color-adjust: exact; 
-  //             print-color-adjust: exact; 
-  //           }
-
-  //           /* Strict 4:3 Landscape Dimensions */
-  //           .cert-container { 
-  //             width: 1024px; 
-  //             height: 768px; 
-  //             position: relative;
-  //             background: #ffffff;
-  //             overflow: hidden;
-  //             display: flex;
-  //             flex-direction: row; /* Forces horizontal split side-by-side */
-  //           }
-
-  //           /* Left Side Layout Group (Triangle and Ribbon Badge) */
-  //           .left-side-graphics {
-  //             width: 320px;
-  //             height: 100%;
-  //             position: relative;
-  //             flex-shrink: 0;
-  //           }
-
-  //           /* Upper-Left Turquoise Geometric Corner */
-  //           .left-side-graphics::before {
-  //             content: '';
-  //             position: absolute;
-  //             top: 0;
-  //             left: 0;
-  //             width: 350px;
-  //             height: 350px;
-  //             background: #1bcca2;
-  //             clip-path: polygon(0 0, 100% 0, 0 100%);
-  //             z-index: 1;
-  //           }
-
-  //           /* SVG Achievement Seal Badge Alignment */
-  //           .award-badge {
-  //             position: absolute;
-  //             top: 80px;
-  //             left: 80px;
-  //             width: 160px;
-  //             height: auto;
-  //             z-index: 2;
-  //           }
-
-  //           /* Right Side Main Content Panel */
-  //           .right-side-content {
-  //             flex-1;
-  //             height: 100%;
-  //             padding: 60px 60px 60px 20px;
-  //             display: flex;
-  //             flex-direction: column;
-  //             justify-content: space-between; /* Ensures footer stays pinned to bottom */
-  //             align-items: flex-start;
-  //             position: relative;
-  //             z-index: 3;
-  //           }
-
-  //           /* Header Institutional Info Branding Layout */
-  //           .cert-header {
-  //             width: 100%;
-  //             text-align: left;
-  //             margin-bottom: 20px;
-  //           }
-  //           .institute-title {
-  //             font-size: 34px;
-  //             font-weight: 800;
-  //             color: #0d5484;
-  //             letter-spacing: 0.02em;
-  //             text-transform: uppercase;
-  //             line-height: 1.2;
-  //             margin-bottom: 6px;
-  //           }
-  //           .institute-motto {
-  //             font-size: 16px;
-  //             font-weight: 600;
-  //             color: #0d5484;
-  //             text-transform: uppercase;
-  //             letter-spacing: 0.15em;
-  //           }
-
-  //           /* Central Credential Text Information Wrapper */
-  //           .cert-body {
-  //             width: 100%;
-  //             text-align: left;
-  //             margin-top: -20px;
-  //           }
-  //           .cert-main-title {
-  //             font-size: 40px;
-  //             font-weight: 800;
-  //             color: #0d5484;
-  //             text-transform: uppercase;
-  //             letter-spacing: 0.04em;
-  //             border-bottom: 5px solid #0d5484;
-  //             padding-bottom: 8px;
-  //             display: inline-block;
-  //             width: 100%;
-  //             max-width: 580px;
-  //             margin-bottom: 35px;
-  //           }
-  //           .cert-attribution {
-  //             font-size: 16px;
-  //             font-weight: 600;
-  //             color: #0d5484;
-  //             text-transform: uppercase;
-  //             letter-spacing: 0.08em;
-  //             margin-bottom: 20px;
-  //           }
-  //           .student-name {
-  //             font-size: 42px;
-  //             font-weight: 700;
-  //             color: #1e293b;
-  //             margin-bottom: 35px;
-  //           }
-  //           .course-name {
-  //             font-size: 42px;
-  //             font-weight: 700;
-  //             color: #0d5484;
-  //             margin-bottom: 35px;
-  //           }
-  //           .cert-description {
-  //             font-size: 19px;
-  //             font-weight: 500;
-  //             color: #334155;
-  //             line-height: 1.6;
-  //             max-width: 600px;
-  //           }
-  //           .course-highlight {
-  //             font-weight: 700;
-  //             color: #0d5484;
-  //           }
-
-  //           /* Footer Security and Authorization Signature Alignment Block */
-  //           .cert-footer {
-  //             width: 100%;
-  //             display: flex;
-  //             justify-content: space-between;
-  //             align-items: flex-end;
-  //           }
-
-  //           /* Left Base Anchor Signatory Line layout */
-  //           .signatory-container {
-  //             display: flex;
-  //             flex-direction: column;
-  //             align-items: center;
-  //             width: 250px;
-  //             text-align: center;
-  //           }
-  //           .date-placeholder {
-  //             font-size: 14px;
-  //             font-weight: 700;
-  //             color: #1bcca2;
-  //             text-transform: uppercase;
-  //             margin-bottom: 4px;
-  //           }
-  //           .signature-rule {
-  //             width: 100%;
-  //             border-top: 4px solid #0d5484;
-  //             margin-top: 4px;
-  //             padding-top: 6px;
-  //           }
-  //           .signer-name {
-  //             font-size: 16px;
-  //             font-weight: 800;
-  //             color: #1bcca2;
-  //             text-transform: uppercase;
-  //             letter-spacing: 0.02em;
-  //           }
-  //           .signer-title {
-  //             font-size: 13px;
-  //             font-weight: 600;
-  //             color: #0d5484;
-  //           }
-
-  //           /* System Tracking Data Identification Copy */
-  //           .meta-block {
-  //             font-size: 10px;
-  //             font-weight: 600;
-  //             color: #64748b;
-  //             text-align: right;
-  //             line-height: 1.5;
-  //           }
-  //           .meta-value {
-  //             font-weight: 700;
-  //             color: #0d5484;
-  //           }
-
-  //           .corner-brand {
-  //             background: #000000; 
-  //             padding: 5px 10px; 
-  //             border-radius: 6px; 
-  //             margin-top: 6px;
-  //             display: inline-block;
-  //           }
-  //           .corner-brand-text {
-  //             color: #ffffff; 
-  //             font-family: 'Montserrat', sans-serif; 
-  //             font-weight: 800; 
-  //             font-size: 16px; 
-  //             letter-spacing: -1px;
-  //           }
-  //         </style>
-  //       </head>
-  //       <body>
-  //         <div class="cert-container">
-
-  //           <div class="left-side-graphics">
-  //             <svg class="award-badge" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  //               <path d="M 35 60 L 20 90 L 35 83 L 50 90 Z" fill="#0d5484" />
-  //               <path d="M 65 60 L 50 90 L 65 83 L 80 90 Z" fill="#0d5484" />
-  //               <circle cx="50" cy="45" r="28" fill="#083e63" />
-  //               <circle cx="50" cy="45" r="25" fill="#1bcca2" clip-path="polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)" opacity="0.15"/>
-  //               <path d="M 50 20 C 36 20, 25 31, 25 45 C 25 59, 36 70, 50 70 C 64 70, 75 59, 75 45 C 75 31, 64 20, 50 20 Z" fill="none" stroke="#0d5484" stroke-width="3" stroke-dasharray="2 1.5"/>
-  //               <polygon points="50,28 55,39 67,41 58,49 61,61 50,55 39,61 42,49 33,41 45,39" fill="#ffffff" />
-  //             </svg>
-  //           </div>
-
-  //           <div class="right-side-content">
-
-  //             <div class="cert-header">
-  //               <h1 class="institute-title">H.B.INSTITUTE - THE TRAINING CENTER</h1>
-  //               <p class="institute-motto">Where Passion Meets Education</p>
-  //             </div>
-
-  //             <div class="cert-body">
-  //               <h2 class="cert-main-title">Certificate of Achievement</h2>
-  //               <p class="cert-attribution">This is presented to</p>
-  //               <div class="student-name">${student.name}</div>
-  //               <p class="cert-description">
-  //                 for exemplary performance in the specialized dynamic course training track of
-  //                 <div class="course-name mb-0">${student.course || 'Information Technology'}</div>
-  //               </p>
-  //             </div>
-
-  //             <div class="cert-footer">
-  //               <div class="signatory-container">
-  //                 <div class="signatory-container">
-  //                   <img src="${signatory}" alt="" width="293" height=100" class="signatory-image" alt="Authorized Signatory Seal" /> 
-  //                   <div class="signatory-line">Authorized Signatory</div>
-  //                 </div>
-  //                 <div class="signature-rule"></div>
-  //                 <div class="signer-name">Shyam Bhojak</div>
-  //                 <div class="signer-title">CEO & Founder</div>
-  //               </div>
-
-  //               <div style="display: flex; flex-direction: column; align-items: flex-end;">
-  //                 <div class="meta-block">
-  //                   <div>ISSUED DATE: <span class="date-placeholder">${completionDateStr}</span></div>
-  //                   <div>ID: <span class="meta-value">${certificateNo}</span></div>
-
-  //                 </div>
-  //                 <div>
-  //                   <img src="${InstituteLogo}" alt="" width="75" height="75" />
-  //                 </div>
-  //               </div>
-  //             </div>
-
-  //           </div>
-
-  //         </div>
-  //       </body>
-  //     </html>
-  //   `;
-
-  //   const blob = new Blob(
-  //     [htmlCertificateContent],
-  //     { type: 'text/html' }
-  //   );
-
-  //   const url = URL.createObjectURL(blob);
-
-  //   window.open(url, '_blank');
-  // };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -562,16 +99,15 @@ const StudentsView = ({ studentSearch, setStudentSearch, globalMonth, setGlobalM
 
       {studentViewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 my-6">
-          {filteredStudents.map((student) => {
+          {sortedFilteredStudents.map((student) => {
             const attendance = studentAttendanceMetrics[student.id];
             const attendanceRatio = attendance?.total ? Math.round((attendance.present / attendance.total) * 100) : 0;
             const textRatio = attendance?.total ? `${attendance.present}/${attendance.total} Days` : 'No sessions marked';
             const totalCourseFee = Number(student.totalFee) || 0;
-            const allowedDiscount = Number(student.discount) || 0; // <-- Fetch allowed discount
+            const allowedDiscount = Number(student.discount) || 0; 
             const paidInstallments = studentFinancialMetrics[student.id] || 0;
             const netExpectedFee = totalCourseFee - allowedDiscount;
             const isFullyPaid = student.feesStatus === 'Paid' || (netExpectedFee > 0 && (netExpectedFee - paidInstallments) <= 0);
-            // Outstanding Due evaluation formula includes discounts safely
             const outstandingBalance = isFullyPaid ? 0 : (netExpectedFee - paidInstallments);
 
             return (
@@ -590,7 +126,6 @@ const StudentsView = ({ studentSearch, setStudentSearch, globalMonth, setGlobalM
                   <div className="p-5 space-y-4">
                     <div className="grid grid-cols-2 gap-2">
                       <div><p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Mobile</p><p className="font-semibold text-sm">{student.mobile || "N/A"}</p></div>
-                      {/* Inside the student card loop in StudentsView.jsx */}
                       <div>
                         <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider mb-1">Enrolled Courses</p>
                         <div className="flex flex-wrap gap-1">
@@ -619,7 +154,6 @@ const StudentsView = ({ studentSearch, setStudentSearch, globalMonth, setGlobalM
                       <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Batch Timing</p>
                       <p className="font-semibold text-sm">{student.batchFrom && student.batchTo ? `${student.batchFrom} - ${student.batchTo}` : 'Not Assigned'}</p>
                     </div>
-                    {/* NEW: Display Multiple Assigned Faculties as Badges */}
                     <div className="pt-1">
                       <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider mb-1.5">Assigned Mentors / Faculty</p>
                       <div className="flex flex-wrap gap-1.5">
@@ -680,22 +214,15 @@ const StudentsView = ({ studentSearch, setStudentSearch, globalMonth, setGlobalM
                     <button onClick={() => deleteStudent(student.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Remove Record"><Trash2 size={16} /></button>
                     <button
                       onClick={() => {
-                        // Filter the global master records down to this specific student's ledger logs
                         const studentFees = feesRecords.filter(f => f.studentId === student.id);
-
-                        // Re-calculate local metrics on the fly matching the model schema hook rules
                         const paid = studentFees.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
                         const totalFee = Number(student.totalFee) || 0;
                         const discount = Number(student.discount) || 0;
                         const balance = Math.max(0, (totalFee - discount) - paid);
-
                         const computedMetrics = { paid, balance };
-
-                        // Run the printing matrix instantly!
                         downloadStatementReceipt(student, studentFees, computedMetrics);
                       }}
                       className="p-2 text-gray-400 hover:text-emerald-500 transition-colors" title="Print Ledger Statement PDF"><Download size={16} /></button>
-                    {/* New Conditional Certificate Button */}
                     {student.status === 'Completed' && (
                       <button
                         onClick={() => generateCertificate(student)}
@@ -735,9 +262,8 @@ const StudentsView = ({ studentSearch, setStudentSearch, globalMonth, setGlobalM
             ))}
           </div>
         </div>
-      )
-      }
-    </div >
+      )}
+    </div>
   );
 };
 

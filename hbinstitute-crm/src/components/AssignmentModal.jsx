@@ -39,7 +39,7 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
       const studentCombinedSlot = `${s.batchFrom} - ${s.batchTo}`;
       
       return s.status === 'Active' && matchesCourse && studentCombinedSlot === batchSlot;
-    });
+    }).sort((a, b) => (b.joiningDate?.seconds || 0) - (a.joiningDate?.seconds || 0));
   }, [students, course, batchSlot]);
 
   const handleConfigurationChange = (field, value) => {

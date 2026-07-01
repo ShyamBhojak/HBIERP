@@ -2,7 +2,7 @@ export const COURSES = [
   'Python Programming', 'Data Analytics', 'Tally Professional (with GST | TCS | TDS)', 'Miracle Accounting Software',
   'C & C++ Programming', 'Java / Advanced Java', 'Web Development (PHP/ASP.NET/PYTHON)',
   'Android App Development', 'Graphic Designing (Photoshop/CorelDRAW)',
-  'Spoken English', 'Personality Development','IELTS', 'PTE', 'DUOLINGO', 'CCC Certification', 'Advanced Excel', 'AI/ML',
+  'Spoken English', 'Basic English','Interview Preparation','Personality Development','IELTS', 'PTE', 'DUOLINGO','Visa Mock Preparation', 'CCC Certification', 'Advanced Excel', 'AI/ML',
   'MERN / Full Stack Development', 'Others'
 ];
 

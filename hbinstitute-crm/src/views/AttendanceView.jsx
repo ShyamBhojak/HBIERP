@@ -59,21 +59,28 @@ const AttendanceView = ({ students, attendanceRecords, saveAttendance, globalMon
     return stats;
   }, [attendanceRecords]);
 
-  // Filter students based on textual match, calendar dates, and active parameters
-  const filteredStudents = students.filter(s => {
-    if (s.status !== 'Active') return false;
+  // Filter and chronologically sort students (Newest Enrolments Listed First)
+  const sortedFilteredStudents = useMemo(() => {
+    if (!students || students.length === 0) return [];
 
-    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          s.course?.toLowerCase().includes(searchQuery.toLowerCase());
+    return students
+      .filter(s => {
+        if (s.status !== 'Active') return false;
 
-    const currentStatus = localRecords[s.id] || 'Unmarked';
-    const matchesStatus = statusFilter === 'All' || currentStatus === statusFilter;
+        const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                              s.course?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // // 3. New Global Common Month Context Alignment Filter
-    // const matchesMonth = globalMonth === 'All' || s.month === globalMonth;
+        const currentStatus = localRecords[s.id] || 'Unmarked';
+        const matchesStatus = statusFilter === 'All' || currentStatus === statusFilter;
 
-    return matchesSearch && matchesStatus;
-  });
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => {
+        const timestampA = a.joiningDate?.seconds || 0;
+        const timestampB = b.joiningDate?.seconds || 0;
+        return timestampB - timestampA; // Descending chronological sorting pass
+      });
+  }, [students, searchQuery, localRecords, statusFilter]);
 
   return (
     <div className="space-y-6">
@@ -170,7 +177,7 @@ const AttendanceView = ({ students, attendanceRecords, saveAttendance, globalMon
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {filteredStudents.map(student => {
+              {sortedFilteredStudents.map(student => {
                 const totalStats = historicalStats[student.id];
                 const attendanceRate = totalStats?.Total 
                   ? ((totalStats.Present / totalStats.Total) * 100).toFixed(0) 
@@ -233,7 +240,7 @@ const AttendanceView = ({ students, attendanceRecords, saveAttendance, globalMon
               })}
             </tbody>
           </table>
-          {filteredStudents.length === 0 && (
+          {sortedFilteredStudents.length === 0 && (
             <div className="p-20 text-center text-gray-400 font-bold italic text-sm">
               No matching matching parameters found.
             </div>
