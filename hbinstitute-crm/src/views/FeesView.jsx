@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, IndianRupee, Receipt, Landmark, ArrowUpRight, Calendar as CalendarIcon, Filter, History, Download } from 'lucide-react';
 import { downloadStatementReceipt } from '../utils/statementPrinter';
+import { sendPushNotification } from '../utils/adminNotification';
 
 const FeesView = ({ students, feesRecords, saveFeePayment, globalMonth }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,7 +62,7 @@ const FeesView = ({ students, feesRecords, saveFeePayment, globalMonth }) => {
         const matchesMonth = effectiveMonth === 'All' || s.month === effectiveMonth;
         if (!matchesMonth) return;
         const courseFee = Number(s.totalFee) || 15000;
-        const allowedDiscount = Number(s.discount) || 0; 
+        const allowedDiscount = Number(s.discount) || 0;
         totalExpected += (courseFee - allowedDiscount);
         totalCollected += (studentPayments[s.id] || 0);
       }
@@ -91,7 +92,7 @@ const FeesView = ({ students, feesRecords, saveFeePayment, globalMonth }) => {
       })
       .map(student => {
         const totalFee = Number(student.totalFee) || 15000;
-        const discount = Number(student.discount) || 0; 
+        const discount = Number(student.discount) || 0;
         const paid = studentPayments[student.id] || 0;
         const history = feesRecords
           .filter(tx => tx.studentId === student.id)
@@ -123,6 +124,18 @@ const FeesView = ({ students, feesRecords, saveFeePayment, globalMonth }) => {
     setPaymentAmount('');
     setPaymentRemarks('');
     setSelectedStudentId('');
+    // const student = students.find(s => s.id === selectedStudentId); //[cite: 3]
+
+    // 2. Trigger the message alert right after a successful database log
+    if (student?.fcmToken) {
+      sendPushNotification(
+        student.fcmToken,
+        "💰 Fee Payment Confirmed!",
+        `An installment of ₹${Number(paymentAmount).toLocaleString('en-IN')} has been credited to your ledger.`
+      );
+    }
+
+    alert(`Installment of ₹${paymentAmount} logged successfully!`); //[cite: 3]
   };
 
   return (

@@ -3,16 +3,17 @@ import { X, FileText, Calendar, BookOpen, User, Clock, CheckSquare, Loader2 } fr
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../config/firebase';
 import { COURSES } from '../constants/options';
+import { sendPushNotification } from '../utils/adminNotification';
 
 const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, students }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [course, setCourse] = useState(COURSES[0]);
-  
+
   // Dates configuration tracking inputs
   const [givenDate, setGivenDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
-  
+
   const [selectedFacultyId, setSelectedFacultyId] = useState('');
   const [batchSlot, setBatchSlot] = useState(''); // Holds the unique dynamic string e.g., "04:00 PM - 05:00 PM"
   const [assignedStudentIds, setAssignedStudentIds] = useState([]);
@@ -24,7 +25,7 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
     const slots = (students || [])
       .filter(s => s.status === 'Active' && s.batchFrom && s.batchTo)
       .map(s => `${s.batchFrom} - ${s.batchTo}`);
-    
+
     // Filter out duplicates to get a clean unique array list
     return [...new Set(slots)].sort();
   }, [students]);
@@ -32,12 +33,12 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
   // Filter eligible student list dynamically mapping against the dynamic batch slot string layout
   const targetStudents = useMemo(() => {
     if (!course || !batchSlot) return [];
-    
+
     return (students || []).filter(s => {
       const studentCourses = s.courses || (s.course ? [s.course] : []);
       const matchesCourse = studentCourses.includes(course);
       const studentCombinedSlot = `${s.batchFrom} - ${s.batchTo}`;
-      
+
       return s.status === 'Active' && matchesCourse && studentCombinedSlot === batchSlot;
     }).sort((a, b) => (b.joiningDate?.seconds || 0) - (a.joiningDate?.seconds || 0));
   }, [students, course, batchSlot]);
@@ -49,7 +50,7 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
   };
 
   const toggleStudentSelection = (studentId) => {
-    setAssignedStudentIds(prev => 
+    setAssignedStudentIds(prev =>
       prev.includes(studentId) ? prev.filter(id => id !== studentId) : [...prev, studentId]
     );
   };
@@ -64,7 +65,7 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    
+
     const facultyMember = faculty.find(f => f.id === selectedFacultyId);
     if (!facultyMember) return alert("Please select a valid faculty instructor.");
     if (!batchSlot) return alert("Please select a targeted batch slot timing context.");
@@ -79,20 +80,20 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
         const storageRef = ref(storage, `assignments/${uniqueFileId}`);
         const snapshot = await uploadBytes(storageRef, selectedFile);
         const downloadUrl = await getDownloadURL(snapshot.ref);
-        
+
         fileAttachmentPayload = {
           name: selectedFile.name,
           url: downloadUrl
         };
       }
 
-      handleSaveAssignment({
+      await handleSaveAssignment({
         title,
         description,
         course,
-        givenDate, 
+        givenDate,
         dueDate,
-        batchSlot, 
+        batchSlot,
         facultyId: facultyMember.id,
         facultyName: facultyMember.name,
         assignedStudentIds,
@@ -102,18 +103,32 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
           return acc;
         }, {})
       });
+      // 2. Loop through all selected student IDs to trigger real-time push alerts
+      assignedStudentIds.forEach(studentId => {
+        // Find the student's profile from your master array to pull their fcmToken
+        const studentProfile = students.find(s => s.id === studentId);
+
+        if (studentProfile?.fcmToken) {
+          sendPushNotification(
+            studentProfile.fcmToken,
+            "📚 New Assignment Published!",
+            `A new task "${title}" has been assigned to your ${course} class by ${facultyMember.name}.`
+          );
+        }
+      });
     } catch (err) {
       console.error(err);
       alert("Failed to compile and attach file assets.");
     } finally {
       setUploading(false);
     }
+
   };
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
-        
+
         <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-950">
           <div>
             <h3 className="text-xl font-black tracking-tight uppercase">Create New Assignment</h3>
@@ -125,10 +140,10 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
         </div>
 
         <form onSubmit={onSubmit} className="p-6 space-y-4 text-xs overflow-y-auto max-h-[75vh]">
-          
+
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1">
-              <FileText size={12}/> Task Assignment Title
+              <FileText size={12} /> Task Assignment Title
             </label>
             <input required type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Practice Set 1 - Array Matrices" className="w-full bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-3.5 font-semibold outline-none focus:ring-1 focus:ring-indigo-500" />
           </div>
@@ -136,7 +151,7 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1">
-                <User size={12}/> Assigning Faculty
+                <User size={12} /> Assigning Faculty
               </label>
               <select required value={selectedFacultyId} onChange={e => setSelectedFacultyId(e.target.value)} className="w-full bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl p-3.5 font-bold cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500">
                 <option value="">Select Instructor</option>
@@ -147,7 +162,7 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
             {/* DYNAMIC BATCH SLOT TIMING SELECTION DROPDOWN */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1">
-                <Clock size={12}/> Targeted Batch Slot
+                <Clock size={12} /> Targeted Batch Slot
               </label>
               <select required value={batchSlot} onChange={e => handleConfigurationChange('batchSlot', e.target.value)} className="w-full bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl p-3.5 font-bold cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer">
                 <option value="">Select Active Batch Timings</option>
@@ -161,7 +176,7 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
           <div className="grid md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1">
-                <BookOpen size={12}/> Target Course
+                <BookOpen size={12} /> Target Course
               </label>
               <select value={course} onChange={e => handleConfigurationChange('course', e.target.value)} className="w-full bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl p-3.5 font-bold cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500">
                 {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -170,14 +185,14 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1">
-                <Calendar size={12}/> Task Given Date
+                <Calendar size={12} /> Task Given Date
               </label>
               <input required type="date" value={givenDate} onChange={e => setGivenDate(e.target.value)} className="w-full bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl p-3.5 font-bold outline-none focus:ring-1 focus:ring-indigo-500" />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1">
-                <Calendar size={12}/> Submission Deadline
+                <Calendar size={12} /> Submission Deadline
               </label>
               <input required type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl p-3.5 font-bold outline-none focus:ring-1 focus:ring-indigo-500" />
             </div>
@@ -186,7 +201,7 @@ const AssignmentModal = ({ closeAssignmentModal, handleSaveAssignment, faculty, 
           {/* Dynamic Checklist */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center px-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CheckSquare size={12}/> Assign Students</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CheckSquare size={12} /> Assign Students</label>
               {targetStudents.length > 0 && (
                 <button type="button" onClick={selectAllTargetStudents} className="text-[9px] font-black text-indigo-500 uppercase tracking-wider hover:underline">
                   {assignedStudentIds.length === targetStudents.length ? 'Deselect All' : 'Select All'}

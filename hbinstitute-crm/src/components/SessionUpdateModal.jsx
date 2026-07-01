@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { X, Calendar, Clock, User, BookOpen, MessageSquare, Users } from 'lucide-react';
 import { COURSES } from '../constants/options';
+import { sendPushNotification } from '../utils/adminNotification';
 
 const SessionUpdateModal = ({ closeSessionModal, handleSaveSession, faculty, students, editingSession, currentSessionData, setCurrentSessionData }) => {
 
@@ -85,11 +86,24 @@ const SessionUpdateModal = ({ closeSessionModal, handleSaveSession, faculty, stu
     }
 
     const matchedFaculty = faculty.find(f => f.id === currentSessionData.facultyId);
+    const facultyNameString = matchedFaculty ? matchedFaculty.name : 'Unknown Instructor';
 
     handleSaveSession({
       ...currentSessionData,
-      facultyName: matchedFaculty ? matchedFaculty.name : 'Unknown Instructor',
+      facultyName: facultyNameString,
       date: new Date(formattedInputDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    });
+
+    // Loop through selected students to fire real-time push alerts cleanly
+    currentSessionData.assignedStudentIds.forEach(studentId => {
+      const studentProfile = students.find(s => s.id === studentId);
+      if (studentProfile?.fcmToken) {
+        sendPushNotification(
+          studentProfile.fcmToken,
+          "📖 Classroom Update Posted",
+          `${facultyNameString} just logged a new session log details update for your ${currentSessionData.course || COURSES[0]} class.`
+        );
+      }
     });
   };
 

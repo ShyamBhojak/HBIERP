@@ -9,6 +9,7 @@ import { downloadStatementReceipt } from '../utils/statementPrinter';
 // Reference the provided logo asset file verbatim
 import InstituteLogo from '../assets/2231B0A7-6B93-4CCF-AAC6-14A13C40CF2F.JPG.jpeg';
 // import signatory from '../assets/signatory.PNG';
+import { requestNotificationPermission, listenToForegroundMessages } from '../utils/notifications';
 
 const StudentPortal = ({ user, studentProfileProp }) => {
   const [studentProfile, setStudentProfile] = useState(studentProfileProp);
@@ -31,6 +32,11 @@ const StudentPortal = ({ user, studentProfileProp }) => {
 
   useEffect(() => {
     if (!studentProfile?.id) return;
+    // 1. Prompt for push permissions and bind token to profile record
+    requestNotificationPermission(studentProfile.id);
+
+    // 2. Open running listener stream for open browser foreground tabs
+    listenToForegroundMessages();
 
     const unsubscribeAtt = onSnapshot(
       collection(db, 'artifacts', appId, 'public', 'data', 'attendance'),
