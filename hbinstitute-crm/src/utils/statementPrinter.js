@@ -15,6 +15,11 @@ export const downloadStatementReceipt = (studentProfile, feesRecords, metrics) =
   const originalTitle = window.document.title;
   window.document.title = `${cleanStudentName}_Fees_Statement`;
 
+  // Safely resolve the student's assigned course track listing description layout string
+  const resolvedCourseDisplay = studentProfile.courses && Array.isArray(studentProfile.courses)
+    ? studentProfile.courses.map(c => typeof c === 'object' ? c.name : c).join(', ')
+    : (typeof studentProfile.course === 'object' ? studentProfile.course.name : (studentProfile.course || 'N/A'));
+
   const htmlInvoiceContent = `
     <html>
       <head>
@@ -30,7 +35,7 @@ export const downloadStatementReceipt = (studentProfile, feesRecords, metrics) =
           .brand-subtitle { font-size: 11px; font-weight: 800; color: #4f46e5; text-transform: uppercase; tracking: 0.05em; margin-top: 1px; }
           .brand-contact { font-size: 10px; color: #64748b; line-height: 1.5; font-weight: 600; margin-top: 5px; }
           .invoice-label { font-size: 18px; font-weight: 900; text-transform: uppercase; text-align: right; color: #0f172a; }
-          .meta-grid { display: flex; justify-content: space-between; margin-bottom: 30px; background: #f8fafc; padding: 16px; border-radius: 16px; border: 1px solid #f1f5f9; }
+          .meta-grid { display: flex; justify-content: space-between; margin-bottom: 30px; background: #f8fafc; padding: 16px; border-radius: 16px; border: 1px solid #f1f5f9; gap: 12px; }
           .meta-block p { font-size: 10px; text-transform: uppercase; font-weight: 800; color: #64748b; margin-bottom: 3px; }
           .meta-block h4 { font-size: 14px; color: #0f172a; font-weight: 800; text-transform: uppercase; }
           .table-box { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
@@ -44,7 +49,6 @@ export const downloadStatementReceipt = (studentProfile, feesRecords, metrics) =
           .signatory-image { width: 160px; height: auto; display: block; margin: 0 auto -5px auto; mix-blend-mode: multiply; }
           .signatory-line { border-top: 1px solid #cbd5e1; margin-top: 5px; padding-top: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; tracking: 0.05em; color: #475569; }
           .footer-msg { text-align: center; margin-top: 40px; font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
-
         </style>
       </head>
       <body>
@@ -67,16 +71,19 @@ export const downloadStatementReceipt = (studentProfile, feesRecords, metrics) =
               <p style="font-size:11px; font-weight:800; color:#64748b; text-align:right; margin-top:4px;">Date: ${new Date().toLocaleDateString('en-GB')}</p>
             </div>
           </div>
+          
           <div class="meta-grid">
             <div class="meta-block">
               <p>Student Name</p>
               <h4>${studentProfile.name}</h4>
+              <h4 style="color: #4f46e5;">${resolvedCourseDisplay}</h4>
             </div>
             <div class="meta-block" style="text-align: right;">
               <p>Student Reference</p>
               <h4>ID: ${studentProfile.id.toUpperCase()}</h4>
             </div>
           </div>
+          
           <table class="table-box">
             <thead>
               <tr><th>Date</th><th>Method</th><th>Remarks</th><th style="text-align: right;">Amount</th></tr>
@@ -94,7 +101,8 @@ export const downloadStatementReceipt = (studentProfile, feesRecords, metrics) =
           </table>
           <div class="closing-block">
             <div class="signatory-container">
-              <img src="${signatory}" alt="" width="293" height="50" class="signatory-image" alt="Authorized Signatory Seal" />               <div class="signatory-line">Authorized Signatory</div>
+              <img src="${signatory}" alt="Authorized Signatory Seal" width="293" height="50" class="signatory-image" />
+              <div class="signatory-line">Authorized Signatory</div>
             </div>
             <div class="summary-box">
               <div class="summary-row"><span>Gross Tuition Fee</span><span>₹${(Number(studentProfile.totalFee) || 0).toLocaleString('en-IN')}.00</span></div>
@@ -102,7 +110,6 @@ export const downloadStatementReceipt = (studentProfile, feesRecords, metrics) =
               <div class="summary-row"><span>Total Paid Collected</span><span>₹${metrics.paid.toLocaleString('en-IN')}.00</span></div>
               <div class="summary-row total-row"><span>Outstanding Balance</span><span>₹${metrics.balance.toLocaleString('en-IN')}.00</span></div>
             </div>
-
           </div>
           <div class="footer-msg">Thank you for learning with us!</div>
         </div>
